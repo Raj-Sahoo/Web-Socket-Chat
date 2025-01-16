@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div id="login">
+            <h4>Welcome to ChatRoom</h4>
+            <p class="subtitle">Enter your nickname to join the conversation</p>
+            <div class="input-group">
+                <input id="nickname-input" type="text" placeholder="Your nickname" />
+                <button id="join-button">Join Chat</button>
+            </div>
+        </div>
+        
+        <div id="chat-container">
+            <header class="chat-header">
+                <h3>ChatRoom</h3>
+                <span class="online-status">● Online</span>
+            </header>
+            <div id="messages"></div>
+            <form id="message-form">
+                <input id="message-input" type="text" placeholder="Type your message..." required />
+                <button type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        
+        // DOM Elements
+        const loginDiv = document.getElementById('login');
+        const chatContainer = document.getElementById('chat-container');
+        const nicknameInput = document.getElementById('nickname-input');
+        const joinButton = document.getElementById('join-button');
+        const messagesDiv = document.getElementById('messages');
+        const messageForm = document.getElementById('message-form');
+        const messageInput = document.getElementById('message-input');
+
+        // Initially show login and hide chat
+        loginDiv.style.display = 'block';
+        chatContainer.style.display = 'none';
+
+        // Join chat when button is clicked
+        joinButton.addEventListener('click', () => {
+            const nickname = nicknameInput.value.trim();
+            if (nickname) {
+                socket.emit('setNickname', nickname);
+                loginDiv.style.display = 'none';
+                chatContainer.style.display = 'flex';
+            }
+        });
+
+        // Also join chat when pressing Enter in nickname input
+        nicknameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const nickname = nicknameInput.value.trim();
+                if (nickname) {
+                    socket.emit('setNickname', nickname);
+                    loginDiv.style.display = 'none';
+                    chatContainer.style.display = 'flex';
+                }
+            }
+        });
+
+        // Handle incoming messages
+        socket.on('message', (message) => {
+            const messageElement = document.createElement('div');
+            
+            if (message.type === 'system') {
+                messageElement.className = 'system-message';
+                messageElement.textContent = message.content;
+            } else {
+                messageElement.className = 'chat-message';
+                messageElement.textContent = `${message.sender}: ${message.content}`;
+            }
+            
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        });
+
+        // Send message when form is submitted
+        messageForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('chatMessage', message);
+                messageInput.value = '';
+            }
+        });
+
+        // Handle typing indicator
+        messageInput.addEventListener('input', () => {
+            socket.emit('typing', true);
+        });
+
+        messageInput.addEventListener('blur', () => {
+            socket.emit('typing', false);
+        });
+
+        // Show typing indicator
+        socket.on('userTyping', ({ user, isTyping }) => {
+            const typingIndicator = document.getElementById('typing-indicator') || document.createElement('div');
+            typingIndicator.id = 'typing-indicator';
+            typingIndicator.className = 'system-message';
+            
+            if (isTyping) {
+                typingIndicator.textContent = `${user} is typing...`;
+                messagesDiv.appendChild(typingIndicator);
+            } else {
+                typingIndicator.remove();
+            }
+        });
+
+        // Update online users list
+        socket.on('activeUsers', (users) => {
+            const onlineStatus = document.querySelector('.online-status');
+            onlineStatus.textContent = `● ${users.length} Online`;
+        });
+    </script>
+</body>
+</html>
